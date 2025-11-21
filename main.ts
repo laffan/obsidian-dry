@@ -198,11 +198,12 @@ export default class DRYPlugin extends Plugin {
 		this.app.workspace.iterateAllLeaves((leaf) => {
 			if (leaf.view instanceof MarkdownView && leaf.view.editor) {
 				const view = leaf.view;
-				// Trigger a state update by accessing the editor
-				// This forces CodeMirror to rebuild decorations
+				// Trigger a state update by re-setting the selection
+				// This forces CodeMirror to rebuild decorations via selectionSet flag
 				const cm = (view.editor as any).cm;
-				if (cm && cm.dispatch) {
-					cm.dispatch({});
+				if (cm && cm.dispatch && cm.state) {
+					const currentSelection = cm.state.selection;
+					cm.dispatch({ selection: currentSelection });
 				}
 			}
 		});
