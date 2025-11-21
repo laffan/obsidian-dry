@@ -9,6 +9,7 @@ interface DRYPluginSettings {
 	range: DetectionRange;
 	stopwords: string[];
 	ignoreProperNouns: boolean;
+	includeBaseWords: boolean;
 }
 
 const DEFAULT_STOPWORDS = [
@@ -42,11 +43,13 @@ const DEFAULT_SETTINGS: DRYPluginSettings = {
 	enabled: true,
 	range: 'paragraph',
 	stopwords: DEFAULT_STOPWORDS,
-	ignoreProperNouns: false
+	ignoreProperNouns: false,
+	includeBaseWords: false
 };
 
 interface WordPosition {
 	word: string;
+	stem: string;
 	from: number;
 	to: number;
 }
@@ -86,10 +89,10 @@ export default class DRYPlugin extends Plugin {
 					const doc = view.state.doc.toString();
 					const repeats = plugin.findRepeatedWords(doc, view);
 
-					// Group repeats by word
+					// Group repeats by word (or stem if includeBaseWords is enabled)
 					const wordGroups = new Map<string, WordPosition[]>();
 					for (const pos of repeats) {
-						const key = pos.word.toLowerCase();
+						const key = plugin.settings.includeBaseWords ? pos.stem : pos.word.toLowerCase();
 						if (!wordGroups.has(key)) {
 							wordGroups.set(key, []);
 						}
@@ -299,12 +302,61 @@ export default class DRYPlugin extends Plugin {
 
 			words.push({
 				word: wordLower,
+				stem: this.stemWord(wordLower),
 				from: offset + match.index,
 				to: offset + match.index + word.length
 			});
 		}
 
 		return words;
+	}
+
+	stemWord(word: string): string {
+		// Simple English stemming algorithm
+		// Removes common suffixes to find base word forms
+
+		// Don't stem very short words
+		if (word.length <= 3) {
+			return word;
+		}
+
+		// Remove common suffixes (order matters - check longer suffixes first)
+		const suffixes = [
+			// Plural and verb forms
+			{ suffix: 'ies', replacement: 'y', minLength: 4 },     // parties -> party
+			{ suffix: 'ied', replacement: 'y', minLength: 4 },     // carried -> carry
+			{ suffix: 'ying', replacement: 'y', minLength: 5 },    // carrying -> carry
+			{ suffix: 'sses', replacement: 'ss', minLength: 5 },   // passes -> pass
+			{ suffix: 'xes', replacement: 'x', minLength: 4 },     // fixes -> fix
+			{ suffix: 'zes', replacement: 'ze', minLength: 4 },    // freezes -> freeze
+			{ suffix: 'ches', replacement: 'ch', minLength: 5 },   // watches -> watch
+			{ suffix: 'shes', replacement: 'sh', minLength: 5 },   // wishes -> wish
+			{ suffix: 'ing', replacement: '', minLength: 4 },      // running -> run, providing -> provid
+			{ suffix: 'ed', replacement: '', minLength: 3 },       // provided -> provid
+			{ suffix: 'es', replacement: '', minLength: 3 },       // provides -> provid
+			{ suffix: 's', replacement: '', minLength: 2 },        // runs -> run
+
+			// Other common suffixes
+			{ suffix: 'ment', replacement: '', minLength: 5 },     // movement -> move
+			{ suffix: 'ness', replacement: '', minLength: 5 },     // happiness -> happi
+			{ suffix: 'tion', replacement: '', minLength: 5 },     // creation -> creat
+			{ suffix: 'ation', replacement: '', minLength: 6 },    // creation -> creat
+			{ suffix: 'er', replacement: '', minLength: 3 },       // faster -> fast
+			{ suffix: 'est', replacement: '', minLength: 4 },      // fastest -> fast
+			{ suffix: 'ly', replacement: '', minLength: 4 },       // quickly -> quick
+		];
+
+		for (const { suffix, replacement, minLength } of suffixes) {
+			if (word.endsWith(suffix) && word.length >= minLength + suffix.length) {
+				const stem = word.slice(0, -suffix.length) + replacement;
+				// Avoid returning stems that are too short
+				if (stem.length >= 2) {
+					return stem;
+				}
+			}
+		}
+
+		return word;
 	}
 
 	isProperNoun(word: string, position: number, text: string): boolean {
@@ -386,6 +438,18 @@ class DRYSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.ignoreProperNouns)
 				.onChange(async (value) => {
 					this.plugin.settings.ignoreProperNouns = value;
+					await this.plugin.saveSettings();
+					this.plugin.refresh();
+				}));
+
+		// Include base words setting
+		new Setting(containerEl)
+			.setName('Include base word repeats')
+			.setDesc('Match words with shared base forms (e.g., "provide" and "providing", "share" and "shared")')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.includeBaseWords)
+				.onChange(async (value) => {
+					this.plugin.settings.includeBaseWords = value;
 					await this.plugin.saveSettings();
 					this.plugin.refresh();
 				}));
