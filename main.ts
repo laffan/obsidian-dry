@@ -8,6 +8,7 @@ interface DRYPluginSettings {
 	enabled: boolean;
 	range: DetectionRange;
 	stopwords: string[];
+	ignoreProperNouns: boolean;
 }
 
 const DEFAULT_STOPWORDS = [
@@ -40,7 +41,8 @@ const DEFAULT_STOPWORDS = [
 const DEFAULT_SETTINGS: DRYPluginSettings = {
 	enabled: true,
 	range: 'paragraph',
-	stopwords: DEFAULT_STOPWORDS
+	stopwords: DEFAULT_STOPWORDS,
+	ignoreProperNouns: false
 };
 
 interface WordPosition {
@@ -290,6 +292,11 @@ export default class DRYPlugin extends Plugin {
 				continue;
 			}
 
+			// Skip proper nouns if setting is enabled
+			if (this.settings.ignoreProperNouns && this.isProperNoun(word, match.index, text)) {
+				continue;
+			}
+
 			words.push({
 				word: wordLower,
 				from: offset + match.index,
@@ -298,6 +305,46 @@ export default class DRYPlugin extends Plugin {
 		}
 
 		return words;
+	}
+
+	isProperNoun(word: string, position: number, text: string): boolean {
+		// Check if the word is capitalized
+		if (word[0] !== word[0].toUpperCase()) {
+			return false;
+		}
+
+		// If it's at the very beginning of the text, it's not a proper noun (sentence start)
+		if (position === 0) {
+			return false;
+		}
+
+		// Check if it's at the start of a sentence
+		// Look backwards from the word position to find non-whitespace characters
+		let i = position - 1;
+
+		// Skip whitespace
+		while (i >= 0 && /\s/.test(text[i])) {
+			i--;
+		}
+
+		// If we're at the start of text, it's a sentence start
+		if (i < 0) {
+			return false;
+		}
+
+		// Check if the previous non-whitespace character is sentence-ending punctuation
+		const prevChar = text[i];
+		if (prevChar === '.' || prevChar === '!' || prevChar === '?') {
+			return false; // It's at the start of a sentence
+		}
+
+		// Check for special case: after a newline (paragraph start)
+		if (prevChar === '\n') {
+			return false;
+		}
+
+		// It's capitalized and not at sentence start, so it's likely a proper noun
+		return true;
 	}
 }
 
@@ -327,6 +374,18 @@ class DRYSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.range)
 				.onChange(async (value) => {
 					this.plugin.settings.range = value as DetectionRange;
+					await this.plugin.saveSettings();
+					this.plugin.refresh();
+				}));
+
+		// Ignore proper nouns setting
+		new Setting(containerEl)
+			.setName('Ignore proper nouns')
+			.setDesc('Skip capitalized words that appear mid-sentence (likely proper nouns like names and places)')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.ignoreProperNouns)
+				.onChange(async (value) => {
+					this.plugin.settings.ignoreProperNouns = value;
 					await this.plugin.saveSettings();
 					this.plugin.refresh();
 				}));
