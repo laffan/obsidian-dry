@@ -94,20 +94,29 @@ export default class DRYPlugin extends Plugin {
 						wordGroups.get(key)!.push(pos);
 					}
 
-					// Assign colors and create decorations
+					// Assign colors to word groups and collect all decorations
+					const decorationsToAdd: Array<{ from: number; to: number; decoration: Decoration }> = [];
 					let colorIndex = 0;
 					for (const [word, positions] of wordGroups) {
 						if (positions.length > 1) {
 							const className = `dry-repeat-${(colorIndex % 10) + 1}`;
 							for (const pos of positions) {
-								builder.add(
-									pos.from,
-									pos.to,
-									Decoration.mark({ class: className })
-								);
+								decorationsToAdd.push({
+									from: pos.from,
+									to: pos.to,
+									decoration: Decoration.mark({ class: className })
+								});
 							}
 							colorIndex++;
 						}
+					}
+
+					// Sort decorations by position before adding to builder
+					decorationsToAdd.sort((a, b) => a.from - b.from);
+
+					// Add decorations in sorted order
+					for (const dec of decorationsToAdd) {
+						builder.add(dec.from, dec.to, dec.decoration);
 					}
 
 					return builder.finish();
