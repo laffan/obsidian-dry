@@ -1,94 +1,88 @@
-# Obsidian Sample Plugin
+# D.R.Y. - Don't Repeat Yourself
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+An Obsidian plugin that helps you identify and highlight repeated words within your writing to improve clarity and conciseness.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## Features
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+- **Smart Repeat Detection**: Automatically detects repeated words within configurable ranges
+- **Color-Coded Highlights**: Each pair of repeated words is highlighted in a unique color for easy identification
+- **Flexible Range Options**: Check for repeats in:
+  - Current paragraph only
+  - Current + previous paragraph
+  - Full document
+- **Customizable Stopwords**: Manage a list of common words to ignore (articles, prepositions, etc.)
+- **Quick Toggle**: Keyboard shortcut and command palette options to turn highlighting on/off
+- **Non-Intrusive**: Only applies visual highlights; doesn't modify your actual content
 
-## First time developing plugins?
+## Installation
 
-Quick starting guide for new plugin devs:
+### Manual Installation
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+1. Download the latest release from the Releases page
+2. Extract the files to your vault's `.obsidian/plugins/obsidian-dry/` folder
+3. Reload Obsidian
+4. Enable the plugin in **Settings → Community plugins**
 
-## Releasing new releases
+### From Community Plugins (coming soon)
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+Search for "D.R.Y." in Obsidian's community plugins browser.
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+## Usage
 
-## Adding your plugin to the community plugin list
+### Basic Usage
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+1. Enable the plugin in settings
+2. Open any note in editing or reading view
+3. The plugin will automatically highlight repeated words based on your configured range
+4. Each pair of repeated words will be shown in a different color
 
-## How to use
+### Toggling the Highlight
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+- **Keyboard shortcut**: Press the configured hotkey (default: can be set in Settings)
+- **Command palette**: Open command palette (Cmd/Ctrl+P) and search for "Toggle D.R.Y. highlighting"
 
-## Manually installing the plugin
+### Configuration
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+Access plugin settings via **Settings → D.R.Y.**
 
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint ./src/`
+#### Detection Range
 
-## Funding URL
+Choose where to look for repeated words:
+- **Current paragraph**: Only checks the active paragraph
+- **Two paragraphs**: Checks current and previous paragraph
+- **Full document**: Scans the entire document
 
-You can include funding URLs where people who use your plugin can financially support it.
+You can also change this via the command palette with "D.R.Y.: Set range to..."
 
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
+#### Stopwords Management
 
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
-```
+Stopwords are common words that are intentionally ignored by the repeat detector (e.g., "the", "a", "an", "in", "on").
 
-If you have multiple URLs, you can also do:
+- **Search**: Filter the stopwords list to find specific words
+- **Add**: Add new words to ignore
+- **Remove**: Click the X next to any word to remove it from the list
+- **Reset**: Restore the default stopwords list
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
-```
+## How It Works
 
-## API Documentation
+The plugin analyzes your text in real-time, identifying words that appear multiple times within the configured range. It intelligently:
+- Ignores case differences (e.g., "The" and "the" are considered the same)
+- Skips stopwords to reduce noise
+- Assigns unique colors to each repeated word pair for easy visual identification
+- Updates highlights as you type
 
-See https://github.com/obsidianmd/obsidian-api
+## Privacy
+
+This plugin operates entirely locally within Obsidian. No data is sent to external servers.
+
+## Support
+
+If you encounter any issues or have feature requests, please file them on the [GitHub Issues page](https://github.com/laffan/obsidian-dry/issues).
+
+## Development
+
+See [AGENTS.md](./AGENTS.md) for development guidelines and setup instructions.
+
+## License
+
+MIT License - see LICENSE file for details.

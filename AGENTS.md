@@ -1,251 +1,187 @@
-# Obsidian community plugin
+# D.R.Y. Plugin Development Guide
 
-## Project overview
+## Project Overview
 
-- Target: Obsidian Community Plugin (TypeScript → bundled JavaScript).
-- Entry point: `main.ts` compiled to `main.js` and loaded by Obsidian.
-- Required release artifacts: `main.js`, `manifest.json`, and optional `styles.css`.
+**D.R.Y. (Don't Repeat Yourself)** is an Obsidian plugin that helps writers identify repeated words within their documents. The plugin highlights repeated words with unique colors for each pair, making it easy to spot and fix redundancy.
 
-## Environment & tooling
+- **Target**: Obsidian Community Plugin (TypeScript → bundled JavaScript)
+- **Entry point**: `main.ts` compiled to `main.js` and loaded by Obsidian
+- **Required artifacts**: `main.js`, `manifest.json`, `styles.css`
 
-- Node.js: use current LTS (Node 18+ recommended).
-- **Package manager: npm** (required for this sample - `package.json` defines npm scripts and dependencies).
-- **Bundler: esbuild** (required for this sample - `esbuild.config.mjs` and build scripts depend on it). Alternative bundlers like Rollup or webpack are acceptable for other projects if they bundle all external dependencies into `main.js`.
-- Types: `obsidian` type definitions.
+## Architecture
 
-**Note**: This sample project has specific technical dependencies on npm and esbuild. If you're creating a plugin from scratch, you can choose different tools, but you'll need to replace the build configuration accordingly.
+### Core Components
 
-### Install
+1. **Plugin Class** (`main.ts`)
+   - Manages plugin lifecycle (load/unload)
+   - Handles settings persistence
+   - Registers commands and hotkeys
+   - Coordinates between highlighter and settings
+
+2. **Settings Interface**
+   - Detection range (paragraph, two paragraphs, full document)
+   - Stopwords list management
+   - Toggle state (enabled/disabled)
+
+3. **Word Detection Engine**
+   - Parses text based on configured range
+   - Identifies repeated words (case-insensitive)
+   - Filters out stopwords
+   - Returns word positions for highlighting
+
+4. **Highlight Renderer**
+   - Applies CSS classes to repeated words
+   - Assigns unique colors to each word pair
+   - Updates highlights dynamically
+   - Cleans up highlights when toggled off
+
+5. **Settings Tab**
+   - Range selection dropdown
+   - Stopwords search/add/remove interface
+   - Reset to defaults button
+
+## Environment & Tooling
+
+- **Node.js**: Use current LTS (Node 18+ recommended)
+- **Package manager**: npm (required - `package.json` defines scripts)
+- **Bundler**: esbuild (required - `esbuild.config.mjs`)
+- **Types**: `obsidian` type definitions
+
+### Install Dependencies
 
 ```bash
 npm install
 ```
 
-### Dev (watch)
+### Development Mode (watch)
 
 ```bash
 npm run dev
 ```
 
-### Production build
+### Production Build
 
 ```bash
 npm run build
 ```
 
-## Linting
+## File Structure
 
-- To use eslint install eslint from terminal: `npm install -g eslint`
-- To use eslint to analyze this project use this command: `eslint main.ts`
-- eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder: `eslint ./src/`
+```
+obsidian-dry/
+├── main.ts              # Plugin entry point
+├── manifest.json        # Plugin metadata
+├── styles.css           # Highlight colors and styles
+├── package.json         # Dependencies and scripts
+├── tsconfig.json        # TypeScript configuration
+├── esbuild.config.mjs   # Build configuration
+├── README.md            # User-facing documentation
+└── AGENTS.md            # This file
+```
 
-## File & folder conventions
+## Key Features Implementation
 
-- **Organize code into multiple files**: Split functionality across separate modules rather than putting everything in `main.ts`.
-- Source lives in `src/`. Keep `main.ts` small and focused on plugin lifecycle (loading, unloading, registering commands).
-- **Example file structure**:
-  ```
-  src/
-    main.ts           # Plugin entry point, lifecycle management
-    settings.ts       # Settings interface and defaults
-    commands/         # Command implementations
-      command1.ts
-      command2.ts
-    ui/              # UI components, modals, views
-      modal.ts
-      view.ts
-    utils/           # Utility functions, helpers
-      helpers.ts
-      constants.ts
-    types.ts         # TypeScript interfaces and types
-  ```
-- **Do not commit build artifacts**: Never commit `node_modules/`, `main.js`, or other generated files to version control.
-- Keep the plugin small. Avoid large dependencies. Prefer browser-compatible packages.
-- Generated output should be placed at the plugin root or `dist/` depending on your build setup. Release artifacts must end up at the top level of the plugin folder in the vault (`main.js`, `manifest.json`, `styles.css`).
+### 1. Range Detection
 
-## Manifest rules (`manifest.json`)
+The plugin supports three detection ranges:
+- **paragraph**: Current paragraph only (text between two newlines)
+- **two-paragraphs**: Current + previous paragraph
+- **document**: Entire document content
 
-- Must include (non-exhaustive):  
-  - `id` (plugin ID; for local dev it should match the folder name)  
-  - `name`  
-  - `version` (Semantic Versioning `x.y.z`)  
-  - `minAppVersion`  
-  - `description`  
-  - `isDesktopOnly` (boolean)  
-  - Optional: `author`, `authorUrl`, `fundingUrl` (string or map)
-- Never change `id` after release. Treat it as stable API.
-- Keep `minAppVersion` accurate when using newer APIs.
-- Canonical requirements are coded here: https://github.com/obsidianmd/obsidian-releases/blob/master/.github/workflows/validate-plugin-entry.yml
+### 2. Stopwords
+
+Default stopwords list includes common English words:
+- Articles: a, an, the
+- Prepositions: in, on, at, to, for, of, with, from, by, about, as
+- Conjunctions: and, or, but, nor, yet, so
+- Pronouns: I, you, he, she, it, we, they, me, him, her, us, them
+- Common verbs: is, are, was, were, be, been, being, have, has, had, do, does, did
+
+### 3. Highlighting Strategy
+
+- Use CSS classes like `dry-repeat-1`, `dry-repeat-2`, etc.
+- Define color palette in `styles.css` with good contrast
+- Limit to ~10 unique colors, then cycle
+- Apply classes via editor decorations or DOM manipulation
+
+### 4. Commands
+
+Register these commands:
+- `dry:toggle` - Toggle highlighting on/off
+- `dry:set-range-paragraph` - Set range to current paragraph
+- `dry:set-range-two` - Set range to two paragraphs
+- `dry:set-range-document` - Set range to full document
 
 ## Testing
 
-- Manual install for testing: copy `main.js`, `manifest.json`, `styles.css` (if any) to:
-  ```
-  <Vault>/.obsidian/plugins/<plugin-id>/
-  ```
-- Reload Obsidian and enable the plugin in **Settings → Community plugins**.
+### Manual Testing
 
-## Commands & settings
+1. Copy `main.js`, `manifest.json`, `styles.css` to:
+   ```
+   <TestVault>/.obsidian/plugins/obsidian-dry/
+   ```
 
-- Any user-facing commands should be added via `this.addCommand(...)`.
-- If the plugin has configuration, provide a settings tab and sensible defaults.
-- Persist settings using `this.loadData()` / `this.saveData()`.
-- Use stable command IDs; avoid renaming once released.
+2. Reload Obsidian and enable the plugin in **Settings → Community plugins**
 
-## Versioning & releases
+3. Test scenarios:
+   - Create a paragraph with repeated words
+   - Toggle highlighting on/off
+   - Change detection range
+   - Add/remove stopwords
+   - Test with multiple paragraphs
+   - Verify colors are distinct and readable
 
-- Bump `version` in `manifest.json` (SemVer) and update `versions.json` to map plugin version → minimum app version.
-- Create a GitHub release whose tag exactly matches `manifest.json`'s `version`. Do not use a leading `v`.
-- Attach `manifest.json`, `main.js`, and `styles.css` (if present) to the release as individual assets.
-- After the initial release, follow the process to add/update your plugin in the community catalog as required.
+## Coding Conventions
 
-## Security, privacy, and compliance
+- TypeScript with `"strict": true`
+- Use `async/await` over promise chains
+- Handle errors gracefully with try-catch
+- Clean up all event listeners in `onunload`
+- Use `this.register*` helpers for cleanup
+- Keep functions focused and well-named
+- Comment complex logic
 
-Follow Obsidian's **Developer Policies** and **Plugin Guidelines**. In particular:
+## Performance Considerations
 
-- Default to local/offline operation. Only make network requests when essential to the feature.
-- No hidden telemetry. If you collect optional analytics or call third-party services, require explicit opt-in and document clearly in `README.md` and in settings.
-- Never execute remote code, fetch and eval scripts, or auto-update plugin code outside of normal releases.
-- Minimize scope: read/write only what's necessary inside the vault. Do not access files outside the vault.
-- Clearly disclose any external services used, data sent, and risks.
-- Respect user privacy. Do not collect vault contents, filenames, or personal information unless absolutely necessary and explicitly consented.
-- Avoid deceptive patterns, ads, or spammy notifications.
-- Register and clean up all DOM, app, and interval listeners using the provided `register*` helpers so the plugin unloads safely.
+- **Debounce text analysis**: Don't analyze on every keystroke
+  - Use 300-500ms debounce for typing
+- **Efficient text parsing**: Avoid regex when simple string operations suffice
+- **Limit scope**: Only analyze visible content when possible
+- **Cache results**: Store word positions to avoid re-parsing
+- **Clean up**: Remove all decorations when toggled off
 
-## UX & copy guidelines (for UI text, commands, settings)
+## Mobile Compatibility
 
-- Prefer sentence case for headings, buttons, and titles.
-- Use clear, action-oriented imperatives in step-by-step copy.
-- Use **bold** to indicate literal UI labels. Prefer "select" for interactions.
-- Use arrow notation for navigation: **Settings → Community plugins**.
-- Keep in-app strings short, consistent, and free of jargon.
+- Plugin should work on mobile (set `isDesktopOnly: false`)
+- Test on iOS/Android if possible
+- Avoid desktop-only APIs
+- Consider touch-friendly settings UI
 
-## Performance
+## Privacy & Security
 
-- Keep startup light. Defer heavy work until needed.
-- Avoid long-running tasks during `onload`; use lazy initialization.
-- Batch disk access and avoid excessive vault scans.
-- Debounce/throttle expensive operations in response to file system events.
+- All processing is local (no network calls)
+- No telemetry or analytics
+- No data collection
+- Settings stored locally via Obsidian API
 
-## Coding conventions
+## Release Process
 
-- TypeScript with `"strict": true` preferred.
-- **Keep `main.ts` minimal**: Focus only on plugin lifecycle (onload, onunload, addCommand calls). Delegate all feature logic to separate modules.
-- **Split large files**: If any file exceeds ~200-300 lines, consider breaking it into smaller, focused modules.
-- **Use clear module boundaries**: Each file should have a single, well-defined responsibility.
-- Bundle everything into `main.js` (no unbundled runtime deps).
-- Avoid Node/Electron APIs if you want mobile compatibility; set `isDesktopOnly` accordingly.
-- Prefer `async/await` over promise chains; handle errors gracefully.
-
-## Mobile
-
-- Where feasible, test on iOS and Android.
-- Don't assume desktop-only behavior unless `isDesktopOnly` is `true`.
-- Avoid large in-memory structures; be mindful of memory and storage constraints.
-
-## Agent do/don't
-
-**Do**
-- Add commands with stable IDs (don't rename once released).
-- Provide defaults and validation in settings.
-- Write idempotent code paths so reload/unload doesn't leak listeners or intervals.
-- Use `this.register*` helpers for everything that needs cleanup.
-
-**Don't**
-- Introduce network calls without an obvious user-facing reason and documentation.
-- Ship features that require cloud services without clear disclosure and explicit opt-in.
-- Store or transmit vault contents unless essential and consented.
-
-## Common tasks
-
-### Organize code across multiple files
-
-**main.ts** (minimal, lifecycle only):
-```ts
-import { Plugin } from "obsidian";
-import { MySettings, DEFAULT_SETTINGS } from "./settings";
-import { registerCommands } from "./commands";
-
-export default class MyPlugin extends Plugin {
-  settings: MySettings;
-
-  async onload() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    registerCommands(this);
-  }
-}
-```
-
-**settings.ts**:
-```ts
-export interface MySettings {
-  enabled: boolean;
-  apiKey: string;
-}
-
-export const DEFAULT_SETTINGS: MySettings = {
-  enabled: true,
-  apiKey: "",
-};
-```
-
-**commands/index.ts**:
-```ts
-import { Plugin } from "obsidian";
-import { doSomething } from "./my-command";
-
-export function registerCommands(plugin: Plugin) {
-  plugin.addCommand({
-    id: "do-something",
-    name: "Do something",
-    callback: () => doSomething(plugin),
-  });
-}
-```
-
-### Add a command
-
-```ts
-this.addCommand({
-  id: "your-command-id",
-  name: "Do the thing",
-  callback: () => this.doTheThing(),
-});
-```
-
-### Persist settings
-
-```ts
-interface MySettings { enabled: boolean }
-const DEFAULT_SETTINGS: MySettings = { enabled: true };
-
-async onload() {
-  this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-  await this.saveData(this.settings);
-}
-```
-
-### Register listeners safely
-
-```ts
-this.registerEvent(this.app.workspace.on("file-open", f => { /* ... */ }));
-this.registerDomEvent(window, "resize", () => { /* ... */ });
-this.registerInterval(window.setInterval(() => { /* ... */ }, 1000));
-```
+1. Update `version` in `manifest.json`
+2. Update `versions.json` with plugin version → minimum Obsidian version
+3. Run `npm run build` to generate production `main.js`
+4. Create GitHub release with tag matching `manifest.json` version (no `v` prefix)
+5. Attach `manifest.json`, `main.js`, `styles.css` to release
 
 ## Troubleshooting
 
-- Plugin doesn't load after build: ensure `main.js` and `manifest.json` are at the top level of the plugin folder under `<Vault>/.obsidian/plugins/<plugin-id>/`. 
-- Build issues: if `main.js` is missing, run `npm run build` or `npm run dev` to compile your TypeScript source code.
-- Commands not appearing: verify `addCommand` runs after `onload` and IDs are unique.
-- Settings not persisting: ensure `loadData`/`saveData` are awaited and you re-render the UI after changes.
-- Mobile-only issues: confirm you're not using desktop-only APIs; check `isDesktopOnly` and adjust.
+- **Highlights not appearing**: Check console for errors, verify CSS is loaded
+- **Performance issues**: Increase debounce time, reduce range
+- **Stopwords not working**: Verify case-insensitive comparison
+- **Colors not distinct**: Adjust CSS color palette in `styles.css`
 
 ## References
 
-- Obsidian sample plugin: https://github.com/obsidianmd/obsidian-sample-plugin
-- API documentation: https://docs.obsidian.md
-- Developer policies: https://docs.obsidian.md/Developer+policies
-- Plugin guidelines: https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines
-- Style guide: https://help.obsidian.md/style-guide
+- [Obsidian API Documentation](https://docs.obsidian.md)
+- [Plugin Guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines)
+- [Sample Plugin](https://github.com/obsidianmd/obsidian-sample-plugin)
+- [Developer Policies](https://docs.obsidian.md/Developer+policies)
