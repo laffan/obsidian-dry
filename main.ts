@@ -74,7 +74,7 @@ export default class DRYPlugin extends Plugin {
 				}
 
 				update(update: ViewUpdate) {
-					if (update.docChanged || update.viewportChanged) {
+					if (update.docChanged || update.viewportChanged || update.selectionSet) {
 						this.decorations = this.buildDecorations(update.view);
 					}
 				}
@@ -194,8 +194,18 @@ export default class DRYPlugin extends Plugin {
 	}
 
 	refresh() {
-		// Trigger editor refresh
-		this.app.workspace.updateOptions();
+		// Force all markdown editors to update their decorations
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			if (leaf.view instanceof MarkdownView && leaf.view.editor) {
+				const view = leaf.view;
+				// Trigger a state update by accessing the editor
+				// This forces CodeMirror to rebuild decorations
+				const cm = (view.editor as any).cm;
+				if (cm && cm.dispatch) {
+					cm.dispatch({});
+				}
+			}
+		});
 	}
 
 	findRepeatedWords(doc: string, view: EditorView): WordPosition[] {
