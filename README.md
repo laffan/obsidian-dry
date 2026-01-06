@@ -1,6 +1,6 @@
 # D.R.Y. - Don't Repeat Yourself
 
-An Obsidian plugin that highlights repeated words as you type.
+An [Obsidian](https://obsidian.md/) plugin that highlights repeated words as you type.
 
 
 ### Usage
