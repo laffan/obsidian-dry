@@ -54,6 +54,14 @@ interface WordPosition {
 	to: number;
 }
 
+interface TokenPosition {
+	word: string;
+	stem: string;
+	from: number;
+	to: number;
+	isStopword: boolean;
+}
+
 export default class DRYPlugin extends Plugin {
 	settings: DRYPluginSettings;
 	private updateDebounceTimer: number | null = null;
@@ -288,18 +296,21 @@ export default class DRYPlugin extends Plugin {
 	}
 
 	extractRepeatedWords(text: string, offset: number): WordPosition[] {
-		const words: WordPosition[] = [];
+		// Extract all tokens including stopwords for phrase detection
+		const allTokens = this.extractAllTokens(text, offset);
+
+		// Find repeated phrases (sequences that repeat)
+		return this.findRepeatedPhrases(allTokens, text, offset);
+	}
+
+	extractAllTokens(text: string, offset: number): TokenPosition[] {
+		const tokens: TokenPosition[] = [];
 		const wordPattern = /\b[\w'-]+\b/g;
 		let match;
 
 		while ((match = wordPattern.exec(text)) !== null) {
 			const word = match[0];
 			const wordLower = word.toLowerCase();
-
-			// Skip stopwords
-			if (this.settings.stopwords.includes(wordLower)) {
-				continue;
-			}
 
 			// Skip numbers
 			if (/^\d+$/.test(word)) {
@@ -311,15 +322,131 @@ export default class DRYPlugin extends Plugin {
 				continue;
 			}
 
-			words.push({
+			const isStopword = this.settings.stopwords.includes(wordLower);
+
+			tokens.push({
 				word: wordLower,
 				stem: this.stemWord(wordLower),
 				from: offset + match.index,
-				to: offset + match.index + word.length
+				to: offset + match.index + word.length,
+				isStopword
 			});
 		}
 
-		return words;
+		return tokens;
+	}
+
+	findRepeatedPhrases(tokens: TokenPosition[], text: string, offset: number): WordPosition[] {
+		if (tokens.length === 0) return [];
+
+		// Build a map of token sequences to their positions
+		// Key format: "stem1|stem2|stem3" or "word1|word2|word3" depending on includeBaseWords
+		const getKey = (token: TokenPosition): string => {
+			return this.settings.includeBaseWords ? token.stem : token.word;
+		};
+
+		// First, find all repeated individual non-stopword tokens
+		const tokenOccurrences = new Map<string, number[]>(); // key -> array of token indices
+		for (let i = 0; i < tokens.length; i++) {
+			if (!tokens[i].isStopword) {
+				const key = getKey(tokens[i]);
+				if (!tokenOccurrences.has(key)) {
+					tokenOccurrences.set(key, []);
+				}
+				tokenOccurrences.get(key)!.push(i);
+			}
+		}
+
+		// Track which token indices are covered by a phrase
+		const coveredByPhrase = new Set<number>();
+		const results: WordPosition[] = [];
+
+		// For each repeated token, try to extend it into a phrase
+		// Process tokens in order to handle overlaps consistently
+		for (let i = 0; i < tokens.length; i++) {
+			if (tokens[i].isStopword) continue;
+			if (coveredByPhrase.has(i)) continue;
+
+			const key = getKey(tokens[i]);
+			const occurrences = tokenOccurrences.get(key);
+			if (!occurrences || occurrences.length < 2) continue;
+
+			// Try to find the longest phrase starting at this position that repeats
+			let bestPhraseLength = 1; // At minimum, the single word repeats
+			let bestPhraseMatches: number[] = occurrences.filter(idx => idx !== i);
+
+			// Try extending the phrase
+			for (let phraseLen = 2; phraseLen <= tokens.length - i; phraseLen++) {
+				// Build the phrase key for tokens[i..i+phraseLen-1]
+				const phraseKeys: string[] = [];
+				for (let j = 0; j < phraseLen; j++) {
+					phraseKeys.push(getKey(tokens[i + j]));
+				}
+				const phraseKey = phraseKeys.join('|');
+
+				// Find other occurrences of this exact phrase
+				const phraseMatches: number[] = [];
+				for (const startIdx of occurrences) {
+					if (startIdx === i) continue;
+					if (startIdx + phraseLen > tokens.length) continue;
+
+					// Check if the phrase matches
+					let matches = true;
+					for (let j = 0; j < phraseLen; j++) {
+						if (getKey(tokens[startIdx + j]) !== phraseKeys[j]) {
+							matches = false;
+							break;
+						}
+					}
+
+					if (matches) {
+						phraseMatches.push(startIdx);
+					}
+				}
+
+				if (phraseMatches.length > 0) {
+					bestPhraseLength = phraseLen;
+					bestPhraseMatches = phraseMatches;
+				} else {
+					// No matches for this length, stop extending
+					break;
+				}
+			}
+
+			// Now we have the best phrase starting at position i
+			// Add all occurrences of this phrase (including position i)
+			const allOccurrences = [i, ...bestPhraseMatches];
+
+			// Check if this phrase contains at least one non-stopword (it does, since we started from one)
+			// Create WordPosition entries for each occurrence
+			for (const startIdx of allOccurrences) {
+				// Mark all tokens in this phrase as covered
+				for (let j = 0; j < bestPhraseLength; j++) {
+					coveredByPhrase.add(startIdx + j);
+				}
+
+				// Create a single WordPosition spanning the entire phrase
+				const startToken = tokens[startIdx];
+				const endToken = tokens[startIdx + bestPhraseLength - 1];
+
+				// Build the phrase word and stem for grouping
+				const phraseWords: string[] = [];
+				const phraseStems: string[] = [];
+				for (let j = 0; j < bestPhraseLength; j++) {
+					phraseWords.push(tokens[startIdx + j].word);
+					phraseStems.push(tokens[startIdx + j].stem);
+				}
+
+				results.push({
+					word: phraseWords.join('|'),
+					stem: phraseStems.join('|'),
+					from: startToken.from,
+					to: endToken.to
+				});
+			}
+		}
+
+		return results;
 	}
 
 	stemWord(word: string): string {
