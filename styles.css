@@ -186,3 +186,8 @@
 	background-color: rgba(233, 30, 99, 0.25);
 	border-bottom-color: rgba(233, 30, 99, 0.6);
 }
+
+/* Remove dashed border from Add Property button in frontmatter */
+.metadata-add-button {
+	border-style: none !important;
+}

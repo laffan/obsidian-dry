@@ -69,6 +69,18 @@ export default class DRYPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
+		// Collapse frontmatter when switching documents or opening files
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', () => {
+				this.collapseFrontmatter();
+			})
+		);
+
+		// Also collapse frontmatter when layout is ready (initial load)
+		this.app.workspace.onLayoutReady(() => {
+			this.collapseFrontmatter();
+		});
+
 		// Register the editor extension
 		this.registerEditorExtension([
 			ViewPlugin.fromClass(class {
@@ -215,6 +227,16 @@ export default class DRYPlugin extends Plugin {
 				}
 			}
 		});
+	}
+
+	collapseFrontmatter() {
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (activeView) {
+			const metadataEditor = (activeView as any).metadataEditor;
+			if (metadataEditor && typeof metadataEditor.setCollapse === 'function') {
+				metadataEditor.setCollapse(true);
+			}
+		}
 	}
 
 	findRepeatedWords(doc: string, view: EditorView): WordPosition[] {
