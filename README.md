@@ -10,7 +10,7 @@ An [Obsidian](https://obsidian.md/) plugin that highlights repeated words as you
 
 ## Installation
 
-1. Download the zipped [release](#/releases) file and unzip it. 
+1. Download the zipped [release](https://github.com/laffan/obsidian-dry/releases) file and unzip it. 
 2. In Obsidian, navigate to Settings > Community Plugins. 
 3. Click the folder icon above the "Installed plugins" list.  
 4. Drag the unzipped release in to "plugins" folder.
